@@ -1,13 +1,10 @@
 version: "2"
 
-run:
-  timeout: 2m
-
 linters:
+  default: standard
+  enable:
+    - revive
+
+formatters:
   enable:
     - gofmt
-    - govet
-    - revive
-    - staticcheck
-    - ineffassign
-    - unused
