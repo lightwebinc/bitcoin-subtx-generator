@@ -20,8 +20,8 @@ import (
 	"time"
 
 	myframe "github.com/lightwebinc/bitcoin-subtx-generator/internal/frame"
-	"github.com/lightwebinc/bitcoin-subtx-generator/internal/seq"
 	"github.com/lightwebinc/bitcoin-subtx-generator/internal/sender"
+	"github.com/lightwebinc/bitcoin-subtx-generator/internal/seq"
 	"github.com/lightwebinc/bitcoin-subtx-generator/internal/subtree"
 )
 
@@ -30,22 +30,22 @@ var Version = "dev"
 
 func main() {
 	var (
-		addr         = flag.String("addr", "[::1]:9000", "target host:port (UDP)")
-		frameVer     = flag.Int("frame-version", 2, "frame version to emit (1 or 2)")
-		shardBits    = flag.Uint("shard-bits", 2, "informational: shard-bits the proxy uses (for predicted-group logging)")
-		subtrees     = flag.Int("subtrees", 8, "number of random subtree IDs (0 = no SubtreeID)")
-		subtreeSeed  = flag.String("subtree-seed", "bitcoin-subtx-generator-default", "seed for deterministic subtree IDs (string or hex)")
-		pps          = flag.Int("pps", 1000, "target packets per second (0 = unlimited)")
-		duration     = flag.Duration("duration", 10*time.Second, "runtime (0 = until count reached or SIGINT)")
-		count        = flag.Uint64("count", 0, "stop after N frames (0 = unlimited)")
-		workers      = flag.Int("workers", 0, "worker goroutines (0 = runtime.NumCPU)")
-		payloadSize  = flag.Int("payload-size", 512, "random transaction payload size in bytes")
-		seqStart     = flag.Uint64("seq-start", 1, "first sequence number")
-		seqGapEvery  = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames (0 = disabled)")
-		seqGapSize   = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap")
-		seqGapDelay  = flag.Duration("seq-gap-delay", 0, "delay before retransmitting the gap (0 = permanent gap)")
-		senderIDFlag = flag.String("sender-id", "", "IPv6 address to embed as SenderID (empty = auto)")
-		logInterval  = flag.Duration("log-interval", time.Second, "periodic stats interval")
+		addr          = flag.String("addr", "[::1]:9000", "target host:port (UDP)")
+		frameVer      = flag.Int("frame-version", 2, "frame version to emit (1 or 2)")
+		shardBits     = flag.Uint("shard-bits", 2, "informational: shard-bits the proxy uses (for predicted-group logging)")
+		subtrees      = flag.Int("subtrees", 8, "number of random subtree IDs (0 = no SubtreeID)")
+		subtreeSeed   = flag.String("subtree-seed", "bitcoin-subtx-generator-default", "seed for deterministic subtree IDs (string or hex)")
+		pps           = flag.Int("pps", 1000, "target packets per second (0 = unlimited)")
+		duration      = flag.Duration("duration", 10*time.Second, "runtime (0 = until count reached or SIGINT)")
+		count         = flag.Uint64("count", 0, "stop after N frames (0 = unlimited)")
+		workers       = flag.Int("workers", 0, "worker goroutines (0 = runtime.NumCPU)")
+		payloadSize   = flag.Int("payload-size", 512, "random transaction payload size in bytes")
+		seqStart      = flag.Uint64("seq-start", 1, "first sequence number")
+		seqGapEvery   = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames (0 = disabled)")
+		seqGapSize    = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap")
+		seqGapDelay   = flag.Duration("seq-gap-delay", 0, "delay before retransmitting the gap (0 = permanent gap)")
+		senderIDFlag  = flag.String("sender-id", "", "IPv6 address to embed as SenderID (empty = auto)")
+		logInterval   = flag.Duration("log-interval", time.Second, "periodic stats interval")
 		printSubtrees = flag.Bool("print-subtrees", false, "print all generated subtree IDs and exit")
 	)
 	flag.Usage = func() {

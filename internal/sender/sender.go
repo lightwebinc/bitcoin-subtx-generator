@@ -46,13 +46,13 @@ type Config struct {
 
 // Runner ties together the pacer, seq allocator, subtree pool, and worker pool.
 type Runner struct {
-	cfg     Config
-	pool    *subtree.Pool
-	alloc   *seq.Allocator
+	cfg   Config
+	pool  *subtree.Pool
+	alloc *seq.Allocator
 
-	sent    atomic.Uint64
-	bytes   atomic.Uint64
-	errors  atomic.Uint64
+	sent   atomic.Uint64
+	bytes  atomic.Uint64
+	errors atomic.Uint64
 }
 
 // New creates a Runner.

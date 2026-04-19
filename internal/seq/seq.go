@@ -34,8 +34,8 @@ type Allocator struct {
 }
 
 type pendingGap struct {
-	seqs    []uint64
-	dueAt   time.Time
+	seqs  []uint64
+	dueAt time.Time
 }
 
 // Config controls gap injection.
