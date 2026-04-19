@@ -1,0 +1,13 @@
+version: "2"
+
+run:
+  timeout: 2m
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - revive
+    - staticcheck
+    - ineffassign
+    - unused

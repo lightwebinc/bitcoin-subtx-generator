@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout subtx-generator
+        uses: actions/checkout@v4
+        with:
+          path: bitcoin-subtx-generator
+      - name: Checkout shard-common (replace target)
+        uses: actions/checkout@v4
+        with:
+          repository: lightwebinc/bitcoin-shard-common
+          path: bitcoin-shard-common
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Test
+        working-directory: bitcoin-subtx-generator
+        run: |
+          go mod tidy
+          go build ./...
+          go test -race -count=1 ./...
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: bitcoin-subtx-generator
