@@ -84,4 +84,4 @@ internal/sender/      — worker pool driving net.UDPConn per worker
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE).
