@@ -15,6 +15,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"log"
 	"net"
 	"os"
@@ -160,7 +161,8 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 	buf := make([]byte, hdrSize+r.cfg.PayloadSize)
 	payload := make([]byte, r.cfg.PayloadSize)
 
-	f := &common.Frame{SenderID: r.cfg.SenderID, SequenceID: r.sequenceID.Load()}
+	senderID := crc32.Checksum(r.cfg.SenderID[:], crc32.MakeTable(crc32.Castagnoli))
+	f := &common.Frame{SenderID: senderID, SequenceID: uint32(r.sequenceID.Load())}
 
 	for {
 		select {
@@ -188,10 +190,10 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 
 		// Sequence number + subtree.
 		s := r.alloc.Next()
-		f.SeqNum = s
+		f.SeqNum = uint32(s)
 
 		// Update SequenceID with flow reset logic
-		f.SequenceID = r.sequenceID.Load()
+		f.SequenceID = uint32(r.sequenceID.Load())
 		if r.cfg.FlowResetPackets > 0 {
 			cnt := r.flowResetCnt.Add(1)
 			if cnt >= r.cfg.FlowResetPackets {

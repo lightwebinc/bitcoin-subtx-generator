@@ -8,10 +8,15 @@ package frame
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	common "github.com/lightwebinc/bitcoin-shard-common/frame"
 )
+
+const maxPayload = 10 * 1024 * 1024 // 10 MiB, matches protocol spec
+
+var errTooLarge = errors.New("frame: payload exceeds maximum size")
 
 // Version selects the wire format produced by [Encode].
 type Version byte
@@ -26,7 +31,7 @@ const (
 func HeaderSize(v Version) int {
 	switch v {
 	case V1:
-		return common.HeaderSizeV1
+		return common.HeaderSizeLegacy
 	case V2:
 		return common.HeaderSize
 	default:
@@ -48,10 +53,10 @@ func Encode(v Version, f *common.Frame, buf []byte) (int, error) {
 }
 
 func encodeV1(f *common.Frame, buf []byte) (int, error) {
-	if len(f.Payload) > common.MaxPayload {
-		return 0, common.ErrTooLarge
+	if len(f.Payload) > maxPayload {
+		return 0, errTooLarge
 	}
-	total := common.HeaderSizeV1 + len(f.Payload)
+	total := common.HeaderSizeLegacy + len(f.Payload)
 	if len(buf) < total {
 		return 0, fmt.Errorf("frame: buffer too small (%d, need %d)", len(buf), total)
 	}
