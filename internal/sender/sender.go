@@ -188,7 +188,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 
 		// Sequence number + subtree.
 		s := r.alloc.Next()
-		f.ShardSeqNum = s
+		f.SeqNum = s
 
 		// Update SequenceID with flow reset logic
 		f.SequenceID = r.sequenceID.Load()

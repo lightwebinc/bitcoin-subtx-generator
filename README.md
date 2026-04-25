@@ -5,7 +5,7 @@ Random BSV-over-UDP frame generator for load and functional testing of
 and [`bitcoin-shard-listener`](https://github.com/lightwebinc/bitcoin-shard-listener).
 
 Supports v1 (44-byte header) and v2 (100-byte header, with `SubtreeID`,
-`ShardSeqNum`, `SenderID`) frame formats and is designed for multi-core
+`SeqNum`, `SenderID`) frame formats and is designed for multi-core
 line-rate emission.
 
 ## Features
