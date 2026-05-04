@@ -22,7 +22,7 @@ func TestEncodeV2Roundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Version != common.FrameVerBRC122 {
+	if got.Version != common.FrameVerV2 {
 		t.Errorf("version: got %d want brc122", got.Version)
 	}
 	if got.SeqNum != 42 {
