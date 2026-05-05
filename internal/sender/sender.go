@@ -15,7 +15,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"hash/crc32"
 	"log"
 	"net"
 	"os"
@@ -34,17 +33,14 @@ import (
 
 // Config tunes the sender.
 type Config struct {
-	Addr             string // target host:port
-	FrameVersion     myframe.Version
-	Workers          int
-	PPS              int
-	Duration         time.Duration // 0 = run until Count frames sent or ctx canceled
-	Count            uint64        // 0 = unlimited
-	PayloadSize      int
-	SenderID         [16]byte
-	LogInterval      time.Duration
-	FlowResetPackets uint64        // reset SequenceID after this many packets (0 = disabled)
-	FlowResetTime    time.Duration // reset SequenceID after this duration (0 = disabled)
+	Addr         string // target host:port
+	FrameVersion myframe.Version
+	Workers      int
+	PPS          int
+	Duration     time.Duration // 0 = run until Count frames sent or ctx canceled
+	Count        uint64        // 0 = unlimited
+	PayloadSize  int
+	LogInterval  time.Duration
 }
 
 // Runner ties together the pacer, seq allocator, subtree pool, and worker pool.
@@ -53,12 +49,9 @@ type Runner struct {
 	pool  *subtree.Pool
 	alloc *seq.Allocator
 
-	sent          atomic.Uint64
-	bytes         atomic.Uint64
-	errors        atomic.Uint64
-	sequenceID    atomic.Uint64
-	flowResetCnt  atomic.Uint64
-	flowResetTime time.Time
+	sent   atomic.Uint64
+	bytes  atomic.Uint64
+	errors atomic.Uint64
 }
 
 // New creates a Runner.
@@ -72,14 +65,7 @@ func New(cfg Config, pool *subtree.Pool, alloc *seq.Allocator) *Runner {
 	if cfg.LogInterval <= 0 {
 		cfg.LogInterval = time.Second
 	}
-	r := &Runner{cfg: cfg, pool: pool, alloc: alloc}
-	// Initialize with a random SequenceID
-	var sidBuf [8]byte
-	if _, err := cryptorand.Read(sidBuf[:]); err == nil {
-		r.sequenceID.Store(binary.BigEndian.Uint64(sidBuf[:]))
-	}
-	r.flowResetTime = time.Now()
-	return r
+	return &Runner{cfg: cfg, pool: pool, alloc: alloc}
 }
 
 // Run blocks until ctx is canceled, Count is reached, or Duration elapses.
@@ -161,8 +147,7 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 	buf := make([]byte, hdrSize+r.cfg.PayloadSize)
 	payload := make([]byte, r.cfg.PayloadSize)
 
-	senderID := crc32.Checksum(r.cfg.SenderID[:], crc32.MakeTable(crc32.Castagnoli))
-	f := &common.Frame{SenderID: senderID, SequenceID: uint32(r.sequenceID.Load())}
+	f := &common.Frame{}
 
 	for {
 		select {
@@ -188,23 +173,8 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 		payload = builder.Build(payload[:0:cap(payload)], r.cfg.PayloadSize)
 		f.Payload = payload
 
-		// Sequence number + subtree.
-		s := r.alloc.Next()
-		f.SeqNum = uint32(s)
-
-		// Update SequenceID with flow reset logic
-		f.SequenceID = uint32(r.sequenceID.Load())
-		if r.cfg.FlowResetPackets > 0 {
-			cnt := r.flowResetCnt.Add(1)
-			if cnt >= r.cfg.FlowResetPackets {
-				r.resetSequenceID()
-			}
-		}
-		if r.cfg.FlowResetTime > 0 {
-			if time.Since(r.flowResetTime) >= r.cfg.FlowResetTime {
-				r.resetSequenceID()
-			}
-		}
+		// Drive gap injection (alloc.Next may sleep to simulate gaps).
+		r.alloc.Next()
 
 		// SubtreeID chosen by txid high bits so listeners filtering on a
 		// single subtree see a predictable fraction of traffic.
@@ -262,13 +232,3 @@ func (r *Runner) Sent() uint64 { return r.sent.Load() }
 
 // Errors returns the total send errors observed.
 func (r *Runner) Errors() uint64 { return r.errors.Load() }
-
-// resetSequenceID generates a new random SequenceID and resets the flow reset counters.
-func (r *Runner) resetSequenceID() {
-	var sidBuf [8]byte
-	if _, err := cryptorand.Read(sidBuf[:]); err == nil {
-		r.sequenceID.Store(binary.BigEndian.Uint64(sidBuf[:]))
-	}
-	r.flowResetCnt.Store(0)
-	r.flowResetTime = time.Now()
-}
