@@ -81,12 +81,39 @@ subtx-gen \
   -pps 1000 -duration 30s
 ```
 
+#### Phased mode — time-varying group membership
+
+Set `-announce-phase-size` and `-announce-phase-interval` to add subtrees to
+the group incrementally. The sender starts with zero active subtrees and adds
+`phase-size` more every `phase-interval`, up to the full pool. The re-announce
+ticker (`-announce-interval`) continues to fire to refresh TTLs of already-active
+subtrees. This produces a visible ramp in dashboard time-series and is used by
+[scenario 21](https://github.com/lightwebinc/bitcoin-multicast-test/tree/main/scenarios/21-subtree-group-ramp).
+
+```bash
+# Announce 1 new subtree every 75s (8 subtrees → full coverage after ~10 min).
+# Re-announce every 12s to keep TTL=90s entries alive.
+subtx-gen \
+  -addr [fd20::2]:9000 \
+  -subtrees 8 \
+  -subtree-seed 'lax-lab-2026' \
+  -subtree-group bfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbf \
+  -announce-addr [fd20::2]:9002 \
+  -announce-interval 12s \
+  -announce-ttl 90 \
+  -announce-phase-size 1 \
+  -announce-phase-interval 75s \
+  -pps 1000 -duration 12m
+```
+
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-subtree-group` | | Comma-separated 32-char hex GroupIDs to announce |
 | `-announce-addr` | | Proxy TCP address for SubtreeAnnounce (empty = disabled) |
-| `-announce-interval` | `10s` | Re-announce period |
+| `-announce-interval` | `10s` | Re-announce period (TTL refresh for active subtrees) |
 | `-announce-ttl` | `0` | TTL field in datagram; 0 = use listener default |
+| `-announce-phase-size` | `0` | Subtrees to add per phase tick; 0 = announce full pool immediately |
+| `-announce-phase-interval` | `0` | How often to advance the phase; 0 = phased mode disabled |
 
 ### Inspect the generated subtree pool
 

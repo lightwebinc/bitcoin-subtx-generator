@@ -6,12 +6,20 @@
 // The proxy detects the MsgTypeSubtreeAnnounce byte (0x30) at offset 6 and
 // forwards the datagram to the CtrlGroupSubtreeAnnounce multicast group
 // instead of treating it as a BRC-124 data frame.
+//
+// Phased mode: when PhaseSize > 0 and PhaseInterval > 0 the sender starts
+// with zero active subtrees and adds PhaseSize more every PhaseInterval tick,
+// up to Pool.Len(). This creates a time-varying membership ramp visible in
+// dashboard time-series. The re-announce ticker (Interval) still fires
+// independently to refresh TTLs of currently-active subtrees.
 package announce
 
 import (
 	"context"
 	"log"
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lightwebinc/bitcoin-shard-common/frame"
@@ -36,10 +44,26 @@ type Sender struct {
 
 	// TTL is placed in the wire format. 0 = use listener default.
 	TTL uint16
+
+	// PhaseSize is the number of additional subtrees to announce on each
+	// PhaseInterval tick. 0 (default) announces the full pool immediately.
+	PhaseSize int
+
+	// PhaseInterval is how often PhaseSize new subtrees are added to the
+	// active set. 0 (default) disables phased mode.
+	PhaseInterval time.Duration
+
+	// phase tracks how many subtrees are currently active (0 = none yet).
+	// Accessed atomically; written only by the phase goroutine.
+	phase atomic.Int32
+
+	// writeMu serialises conn.Write calls across the re-announce ticker and
+	// the phase goroutine so datagrams are never interleaved.
+	writeMu sync.Mutex
 }
 
 // Run connects to ProxyAddr and periodically sends SubtreeAnnounce datagrams
-// for all (SubtreeID, GroupID) pairs. Blocks until ctx is cancelled.
+// for all active (SubtreeID, GroupID) pairs. Blocks until ctx is cancelled.
 func (s *Sender) Run(ctx context.Context) error {
 	if s.Interval <= 0 {
 		s.Interval = 10 * time.Second
@@ -56,10 +80,42 @@ func (s *Sender) Run(ctx context.Context) error {
 		_ = conn.Close()
 	}()
 
-	if err := s.sendAll(conn); err != nil {
-		return err
+	phased := s.PhaseSize > 0 && s.PhaseInterval > 0
+
+	if phased {
+		// Start with no subtrees active; phase goroutine adds them gradually.
+		s.phase.Store(0)
+		go func() {
+			t := time.NewTicker(s.PhaseInterval)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					cur := s.phase.Load()
+					next := cur + int32(s.PhaseSize)
+					if next > int32(s.Pool.Len()) {
+						next = int32(s.Pool.Len())
+					}
+					s.phase.Store(next)
+					log.Printf("announce: phase advanced to %d/%d subtrees", next, s.Pool.Len())
+					// Immediately announce the newly-added subtrees.
+					if err2 := s.sendUpTo(conn, int(next)); err2 != nil {
+						log.Printf("announce: phase send error: %v", err2)
+					}
+				}
+			}
+		}()
+	} else {
+		// Non-phased: announce the full pool right away.
+		s.phase.Store(int32(s.Pool.Len()))
+		if err := s.sendUpTo(conn, s.Pool.Len()); err != nil {
+			return err
+		}
 	}
 
+	// Re-announce ticker: refreshes TTLs of currently-active subtrees.
 	ticker := time.NewTicker(s.Interval)
 	defer ticker.Stop()
 	for {
@@ -67,17 +123,30 @@ func (s *Sender) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := s.sendAll(conn); err != nil {
+			limit := int(s.phase.Load())
+			if limit <= 0 {
+				continue
+			}
+			if err := s.sendUpTo(conn, limit); err != nil {
 				return err
 			}
 		}
 	}
 }
 
-func (s *Sender) sendAll(conn net.Conn) error {
+// sendUpTo sends SubtreeAnnounce datagrams for pool[0..limit) × all GroupIDs.
+// It holds writeMu for the duration so concurrent callers don't interleave.
+func (s *Sender) sendUpTo(conn net.Conn, limit int) error {
+	if limit <= 0 {
+		return nil
+	}
 	epoch := uint32(time.Now().Unix())
 	buf := make([]byte, frame.SubtreeAnnounceSize)
-	for i := 0; i < s.Pool.Len(); i++ {
+
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	for i := 0; i < limit; i++ {
 		sid := s.Pool.At(i)
 		for _, gid := range s.GroupIDs {
 			ann := &frame.SubtreeAnnounce{
@@ -95,7 +164,7 @@ func (s *Sender) sendAll(conn net.Conn) error {
 		}
 	}
 	log.Printf("announce: sent %d datagrams (%d subtrees × %d groups)",
-		s.Pool.Len()*len(s.GroupIDs), s.Pool.Len(), len(s.GroupIDs))
+		limit*len(s.GroupIDs), limit, len(s.GroupIDs))
 	return nil
 }
 
