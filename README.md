@@ -65,6 +65,29 @@ subtx-gen -pps 1000 -duration 30s -seq-gap-every 500
 subtx-gen -pps 1000 -duration 30s -seq-gap-every 500 -seq-gap-delay 50ms
 ```
 
+### BRC-127 SubtreeAnnounce sender
+
+```bash
+# Connect to the proxy TCP ingress and periodically announce all subtree IDs
+# in the pool to the CtrlGroupSubtreeAnnounce control-plane multicast group.
+subtx-gen \
+  -addr [fd20::2]:9000 \
+  -subtrees 8 \
+  -subtree-seed 'lax-lab-2026' \
+  -subtree-group bfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbf \
+  -announce-addr [fd20::2]:9002 \
+  -announce-interval 10s \
+  -announce-ttl 0 \
+  -pps 1000 -duration 30s
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-subtree-group` | | Comma-separated 32-char hex GroupIDs to announce |
+| `-announce-addr` | | Proxy TCP address for SubtreeAnnounce (empty = disabled) |
+| `-announce-interval` | `10s` | Re-announce period |
+| `-announce-ttl` | `0` | TTL field in datagram; 0 = use listener default |
+
 ### Inspect the generated subtree pool
 
 ```bash
@@ -81,6 +104,7 @@ internal/seq/         — shared seq allocator + gap injector
 internal/frame/       — v1/v2 encoder wrapper around bitcoin-shard-common
 internal/rate/        — token-bucket pacer (smooth / burst)
 internal/sender/      — worker pool driving net.UDPConn per worker
+internal/announce/     — BRC-127 SubtreeAnnounce TCP sender
 ```
 
 ## License
