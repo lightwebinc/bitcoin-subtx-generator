@@ -1,6 +1,9 @@
 # bitcoin-subtx-generator
 
 [![CI](https://github.com/lightwebinc/bitcoin-subtx-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/lightwebinc/bitcoin-subtx-generator/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/lightwebinc/bitcoin-subtx-generator.svg)](https://pkg.go.dev/github.com/lightwebinc/bitcoin-subtx-generator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/lightwebinc/bitcoin-subtx-generator)](https://goreportcard.com/report/github.com/lightwebinc/bitcoin-subtx-generator)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Random BSV-over-UDP frame generator for load and functional testing of
 [`bitcoin-shard-proxy`](https://github.com/lightwebinc/bitcoin-shard-proxy)
