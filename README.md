@@ -1,5 +1,7 @@
 # bitcoin-subtx-generator
 
+[![CI](https://github.com/lightwebinc/bitcoin-subtx-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/lightwebinc/bitcoin-subtx-generator/actions/workflows/ci.yml)
+
 Random BSV-over-UDP frame generator for load and functional testing of
 [`bitcoin-shard-proxy`](https://github.com/lightwebinc/bitcoin-shard-proxy)
 and [`bitcoin-shard-listener`](https://github.com/lightwebinc/bitcoin-shard-listener).
