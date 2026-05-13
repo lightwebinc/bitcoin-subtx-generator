@@ -40,6 +40,7 @@ func main() {
 		count                 = flag.Uint64("count", 0, "stop after N frames (0 = unlimited)")
 		workers               = flag.Int("workers", 0, "worker goroutines (0 = runtime.NumCPU)")
 		payloadSize           = flag.Int("payload-size", 512, "random transaction payload size in bytes")
+		payloadFormat         = flag.String("payload-format", "brc124", "payload encoding: brc124 (raw tx), brc128 (BRC-30 EF), or mixed")
 		seqStart              = flag.Uint64("seq-start", 1, "first sequence number")
 		seqGapEvery           = flag.Uint64("seq-gap-every", 0, "inject a gap every N frames (0 = disabled)")
 		seqGapSize            = flag.Uint64("seq-gap-size", 1, "how many seq numbers to skip per gap")
@@ -87,6 +88,19 @@ func main() {
 		log.Fatalf("frame-version must be 1 or 2, got %d", *frameVer)
 	}
 
+	// Payload format (BRC-12 raw vs BRC-30 EF).
+	var pf sender.PayloadFormat
+	switch *payloadFormat {
+	case "brc124", "raw":
+		pf = sender.PayloadBRC124
+	case "brc128", "ef":
+		pf = sender.PayloadBRC128
+	case "mixed":
+		pf = sender.PayloadMixed
+	default:
+		log.Fatalf("payload-format must be brc124, brc128, or mixed; got %q", *payloadFormat)
+	}
+
 	w := *workers
 	if w <= 0 {
 		w = runtime.NumCPU()
@@ -104,8 +118,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	fmt.Fprintf(os.Stderr, "subtx-gen %s: addr=%s frame=v%d pps=%d workers=%d subtrees=%d duration=%s\n",
-		Version, *addr, *frameVer, *pps, w, pool.Len(), *duration)
+	fmt.Fprintf(os.Stderr, "subtx-gen %s: addr=%s frame=v%d payload=%s pps=%d workers=%d subtrees=%d duration=%s\n",
+		Version, *addr, *frameVer, pf, *pps, w, pool.Len(), *duration)
 	if pool.Len() > 0 {
 		fmt.Fprintf(os.Stderr, "  subtree[0]=%s  subtree[n-1]=%s  shard-bits=%d\n",
 			pool.HexAt(0), pool.HexAt(pool.Len()-1), *shardBits)
@@ -113,14 +127,15 @@ func main() {
 	_ = shardBits // reserved for future predicted-group logging
 
 	r := sender.New(sender.Config{
-		Addr:         *addr,
-		FrameVersion: fv,
-		Workers:      w,
-		PPS:          *pps,
-		Duration:     *duration,
-		Count:        *count,
-		PayloadSize:  *payloadSize,
-		LogInterval:  *logInterval,
+		Addr:          *addr,
+		FrameVersion:  fv,
+		Workers:       w,
+		PPS:           *pps,
+		Duration:      *duration,
+		Count:         *count,
+		PayloadSize:   *payloadSize,
+		PayloadFormat: pf,
+		LogInterval:   *logInterval,
 	}, pool, alloc)
 
 	// Start announce goroutine if configured.

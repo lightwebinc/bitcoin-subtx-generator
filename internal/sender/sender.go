@@ -31,16 +31,47 @@ import (
 	"github.com/lightwebinc/bitcoin-subtx-generator/internal/tx"
 )
 
+// PayloadFormat selects the BSV transaction encoding written into each
+// frame's payload field. The frame header (BRC-12 vs BRC-124) is governed
+// independently by Config.FrameVersion.
+type PayloadFormat int
+
+const (
+	// PayloadBRC124 emits BRC-12 raw transaction payloads (default).
+	// Frames carrying BRC-124 payloads are "BRC-124 frames".
+	PayloadBRC124 PayloadFormat = iota
+	// PayloadBRC128 emits BRC-30 Extended Format (EF) transaction payloads.
+	// Frames carrying EF payloads are "BRC-128 frames".
+	PayloadBRC128
+	// PayloadMixed alternates between BRC-124 and BRC-128 payloads on a
+	// per-frame, per-worker basis. Used to verify infrastructure handles
+	// both formats coexisting on the same multicast group.
+	PayloadMixed
+)
+
+// String returns the canonical CLI/env spelling.
+func (p PayloadFormat) String() string {
+	switch p {
+	case PayloadBRC128:
+		return "brc128"
+	case PayloadMixed:
+		return "mixed"
+	default:
+		return "brc124"
+	}
+}
+
 // Config tunes the sender.
 type Config struct {
-	Addr         string // target host:port
-	FrameVersion myframe.Version
-	Workers      int
-	PPS          int
-	Duration     time.Duration // 0 = run until Count frames sent or ctx canceled
-	Count        uint64        // 0 = unlimited
-	PayloadSize  int
-	LogInterval  time.Duration
+	Addr          string // target host:port
+	FrameVersion  myframe.Version
+	Workers       int
+	PPS           int
+	Duration      time.Duration // 0 = run until Count frames sent or ctx canceled
+	Count         uint64        // 0 = unlimited
+	PayloadSize   int
+	PayloadFormat PayloadFormat
+	LogInterval   time.Duration
 }
 
 // Runner ties together the pacer, seq allocator, subtree pool, and worker pool.
@@ -149,6 +180,9 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 
 	f := &common.Frame{}
 
+	// Per-worker frame counter; drives PayloadMixed alternation.
+	var local uint64
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -169,8 +203,20 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			continue
 		}
 
-		// Random payload.
-		payload = builder.Build(payload[:0:cap(payload)], r.cfg.PayloadSize)
+		// Random payload (format chosen per Config.PayloadFormat).
+		useEF := false
+		switch r.cfg.PayloadFormat {
+		case PayloadBRC128:
+			useEF = true
+		case PayloadMixed:
+			useEF = local%2 == 1
+		}
+		local++
+		if useEF {
+			payload = builder.BuildEF(payload[:0:cap(payload)], r.cfg.PayloadSize)
+		} else {
+			payload = builder.Build(payload[:0:cap(payload)], r.cfg.PayloadSize)
+		}
 		f.Payload = payload
 
 		// Drive gap injection (alloc.Next may sleep to simulate gaps).
