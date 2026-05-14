@@ -53,6 +53,7 @@ func main() {
 		announceTTL           = flag.Uint("announce-ttl", 0, "TTL field in SubtreeAnnounce; 0 = use listener default")
 		announcePhaseSize     = flag.Int("announce-phase-size", 0, "subtrees to add per phase tick (0 = announce full pool immediately)")
 		announcePhaseInterval = flag.Duration("announce-phase-interval", 0, "how often to advance the phase; 0 = disabled")
+		corruptTxIDRate       = flag.Uint("corrupt-txid-rate", 0, "percentage of frames to corrupt TxID (0-100, 0=disabled)")
 	)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "subtx-gen %s — BSV frame load generator\n\n", Version)
@@ -127,15 +128,16 @@ func main() {
 	_ = shardBits // reserved for future predicted-group logging
 
 	r := sender.New(sender.Config{
-		Addr:          *addr,
-		FrameVersion:  fv,
-		Workers:       w,
-		PPS:           *pps,
-		Duration:      *duration,
-		Count:         *count,
-		PayloadSize:   *payloadSize,
-		PayloadFormat: pf,
-		LogInterval:   *logInterval,
+		Addr:            *addr,
+		FrameVersion:    fv,
+		Workers:         w,
+		PPS:             *pps,
+		Duration:        *duration,
+		Count:           *count,
+		PayloadSize:     *payloadSize,
+		PayloadFormat:   pf,
+		LogInterval:     *logInterval,
+		CorruptTxIDRate: *corruptTxIDRate,
 	}, pool, alloc)
 
 	// Start announce goroutine if configured.

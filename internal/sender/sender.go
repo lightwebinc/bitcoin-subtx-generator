@@ -12,6 +12,7 @@ package sender
 import (
 	"context"
 	cryptorand "crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -63,15 +64,16 @@ func (p PayloadFormat) String() string {
 
 // Config tunes the sender.
 type Config struct {
-	Addr          string // target host:port
-	FrameVersion  myframe.Version
-	Workers       int
-	PPS           int
-	Duration      time.Duration // 0 = run until Count frames sent or ctx canceled
-	Count         uint64        // 0 = unlimited
-	PayloadSize   int
-	PayloadFormat PayloadFormat
-	LogInterval   time.Duration
+	Addr            string // target host:port
+	FrameVersion    myframe.Version
+	Workers         int
+	PPS             int
+	Duration        time.Duration // 0 = run until Count frames sent or ctx canceled
+	Count           uint64        // 0 = unlimited
+	PayloadSize     int
+	PayloadFormat   PayloadFormat
+	LogInterval     time.Duration
+	CorruptTxIDRate uint // percentage of frames to corrupt TxID (0-100)
 }
 
 // Runner ties together the pacer, seq allocator, subtree pool, and worker pool.
@@ -197,12 +199,6 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			return
 		}
 
-		// Random TxID.
-		if _, err := cryptorand.Read(f.TxID[:]); err != nil {
-			r.errors.Add(1)
-			continue
-		}
-
 		// Random payload (format chosen per Config.PayloadFormat).
 		useEF := false
 		switch r.cfg.PayloadFormat {
@@ -218,6 +214,25 @@ func (r *Runner) worker(ctx context.Context, id int, tokens <-chan struct{}, wg 
 			payload = builder.Build(payload[:0:cap(payload)], r.cfg.PayloadSize)
 		}
 		f.Payload = payload
+
+		// Compute TxID as SHA256d(payload) for valid frames.
+		first := sha256.Sum256(payload)
+		second := sha256.Sum256(first[:])
+		copy(f.TxID[:], second[:])
+
+		// Optionally corrupt TxID (flip a random bit) based on corrupt rate.
+		if r.cfg.CorruptTxIDRate > 0 {
+			var randByte [1]byte
+			if _, err := cryptorand.Read(randByte[:]); err == nil {
+				if uint(randByte[0])%100 < r.cfg.CorruptTxIDRate {
+					// Flip a random bit in the TxID to invalidate the hash.
+					bit := randByte[0]
+					byteIdx := bit / 8
+					bitIdx := bit % 8
+					f.TxID[byteIdx] ^= (1 << bitIdx)
+				}
+			}
+		}
 
 		// Drive gap injection (alloc.Next may sleep to simulate gaps).
 		r.alloc.Next()
