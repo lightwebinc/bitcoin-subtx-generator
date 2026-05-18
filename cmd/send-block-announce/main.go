@@ -33,8 +33,8 @@ const (
 )
 
 func main() {
-	addr     := flag.String("addr", "[::1]:9002", "proxy TCP address (host:port)")
-	blocks   := flag.Int("blocks", 10, "number of simulated blocks to announce")
+	addr := flag.String("addr", "[::1]:9002", "proxy TCP address (host:port)")
+	blocks := flag.Int("blocks", 10, "number of simulated blocks to announce")
 	subtrees := flag.Int("subtrees", 4, "subtree hashes per BlockAnnounce frame")
 	interval := flag.Duration("interval", 100*time.Millisecond, "delay between block pairs")
 	coinbase := flag.Bool("coinbase", true, "also send a CoinbaseTx frame for each block")
@@ -44,7 +44,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("dial %s: %v", *addr, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	log.Printf("connected to %s", *addr)
 
 	sent := 0
