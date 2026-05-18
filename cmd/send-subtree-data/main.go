@@ -22,10 +22,10 @@ import (
 
 // BRC-132 wire constants — mirror of bitcoin-shard-common/frame.
 const (
-	magicBSV    = 0xE3E1F3E8
-	protoVer    = 0x02BF
-	frameVerV5  = 0x05
-	headerSize  = 92
+	magicBSV   = 0xE3E1F3E8
+	protoVer   = 0x02BF
+	frameVerV5 = 0x05
+	headerSize = 92
 
 	subtreeMsgHashesOnly = 0x01
 	subtreeMsgFullNodes  = 0x02
